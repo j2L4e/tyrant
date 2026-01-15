@@ -3,7 +3,6 @@ import numpy as np
 import scipy.io.wavfile as wav
 import tempfile
 import os
-import base64
 from mistralai import Mistral
 import subprocess
 from dotenv import load_dotenv
@@ -20,7 +19,7 @@ def setup_logging(verbose):
 load_dotenv()
 
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
-MODEL_NAME = "voxtral-small-latest"
+MODEL_NAME = "voxtral-mini-latest"
 
 def record_audio(fs=16000, ptt_key=None):
     """
@@ -102,30 +101,16 @@ def transcribe_audio(file_path):
     client = Mistral(api_key=MISTRAL_API_KEY)
     
     with open(file_path, 'rb') as f:
-        content = f.read()
-    
-    audio_base64 = base64.b64encode(content).decode('utf-8')
-
-    response = client.chat.complete(
-        model=MODEL_NAME,
-        messages=[{
-            "role": "user",
-            "content": [
-                {
-                    "type": "input_audio",
-                    "input_audio": audio_base64,
-                },
-                {
-                    "type": "text",
-                    "text": "Transcribe the audio precisely without any additional comments. Transcribe in the language of the audio. DO NOT TRANSLATE!"
-                },
-            ]
-        }],
-    )
+        response = client.audio.transcriptions.complete(
+            model=MODEL_NAME,
+            file={
+                "content": f,
+                "file_name": os.path.basename(file_path),
+            }
+        )
     
     logging.debug(f"API Response: {response}")
-    # The SDK response object has the transcription in its choices[0].message.content
-    return response.choices[0].message.content
+    return response.text
 
 def type_text(text):
     logging.info(f"Typing: {text}")

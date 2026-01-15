@@ -22,14 +22,9 @@ class TestDictate(unittest.TestCase):
     def test_transcribe_audio(self, mock_mistral):
         mock_client = MagicMock()
         mock_response = MagicMock()
-        # Mocking the nested structure: response.choices[0].message.content
-        mock_message = MagicMock()
-        mock_message.content = 'hello world'
-        mock_choice = MagicMock()
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
+        mock_response.text = 'hello world'
         
-        mock_client.chat.complete.return_value = mock_response
+        mock_client.audio.transcriptions.complete.return_value = mock_response
         mock_mistral.return_value = mock_client
         
         with patch('main.MISTRAL_API_KEY', 'fake_key'):

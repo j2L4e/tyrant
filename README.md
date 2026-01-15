@@ -1,6 +1,6 @@
 # Mistral Dictate
 
-A simple application that records your microphone, identifies the language, transcribes the audio using Mistral AI's transcription API, and types the resulting text (including the detected language) into your active window using `xdotool`.
+A simple application that records your microphone, transcribes the audio using Mistral AI's transcription API, and types the resulting text into your active window using `xdotool`.
 
 ## Prerequisites
 
@@ -48,5 +48,5 @@ Options:
 
 ## Notes
 
-- The default model used is `mistral-embed`. You may need to update `MODEL_NAME` in `src/main.py` if Mistral releases a specific "Voxtral" model identifier.
+- The default model used is `voxtral-mini-latest`.
 - Ensure you have a window focused where you want the text to appear before the transcription finishes.
