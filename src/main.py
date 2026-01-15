@@ -19,7 +19,7 @@ def setup_logging(verbose):
 load_dotenv()
 
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
-MODEL_NAME = "voxtral-mini-latest"
+MODEL_NAME = "voxtral-mini-transcribe-2507"
 
 def record_audio(fs=16000, ptt_key=None):
     """
