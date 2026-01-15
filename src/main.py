@@ -32,7 +32,8 @@ def record_audio(fs=16000, ptt_key=None):
     def callback(indata, frames, time, status):
         if status:
             logging.warning(f"Audio status: {status}")
-        recording.append(indata.copy())
+        if not ptt_key or is_recording.is_set():
+            recording.append(indata.copy())
 
     if ptt_key:
         logging.info(f"Hold '{ptt_key}' to record.")
