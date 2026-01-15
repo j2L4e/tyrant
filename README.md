@@ -1,6 +1,6 @@
 # Mistral Dictate
 
-A simple application that records your microphone, transcribes the audio using Mistral AI's transcription API, and types the resulting text into your active window using `xdotool`.
+A simple application that records your microphone, identifies the language, transcribes the audio using Mistral AI's transcription API, and types the resulting text (including the detected language) into your active window using `xdotool`.
 
 ## Prerequisites
 
@@ -31,13 +31,20 @@ python src/main.py
 ```
 
 Options:
-- `-v`, `--verbose`: Enable verbose logging to see debug information (e.g., API requests and temporary file paths).
+- `-v`, `--verbose`: Enable verbose logging.
+- `--ptt KEY`: Use push-to-talk with the specified key (e.g., `ctrl`, `shift`, `caps_lock`).
 
-- The script will start recording. 
-- Speak into your microphone.
-- Press `Ctrl+C` to stop recording.
-- The transcription will be sent to Mistral AI.
-- Once the transcription is received, it will be typed into your currently focused window using `xdotool`.
+### Recording Modes
+
+1. **Manual (Default):**
+   - Run `python src/main.py`.
+   - Recording starts immediately.
+   - Press `Ctrl+C` to stop.
+
+2. **Push-To-Talk (PTT):**
+   - Run `python src/main.py --ptt caps_lock`.
+   - The script waits for you to hold the specified key.
+   - Recording starts when you press the key and stops when you release it.
 
 ## Notes
 
