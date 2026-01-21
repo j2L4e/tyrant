@@ -39,6 +39,8 @@ def record_audio(fs=16000, ptt_key=None):
         logging.info(f"Hold '{ptt_key}' to record.")
         is_recording = threading.Event()
         stop_event = threading.Event()
+        start_time = [0]
+        duration = [0]
 
         def on_press(key):
             try:
@@ -48,6 +50,7 @@ def record_audio(fs=16000, ptt_key=None):
             
             if k == ptt_key and not is_recording.is_set():
                 logging.info("Recording started...")
+                start_time[0] = time.time()
                 is_recording.set()
 
         def on_release(key):
@@ -57,7 +60,8 @@ def record_audio(fs=16000, ptt_key=None):
                 k = key.name
             
             if k == ptt_key:
-                logging.info("Recording stopped.")
+                duration[0] = time.time() - start_time[0]
+                logging.info(f"Recording stopped. Duration: {duration[0]:.2f}s")
                 is_recording.clear()
                 stop_event.set()
                 return False  # Stop listener
@@ -74,6 +78,10 @@ def record_audio(fs=16000, ptt_key=None):
                     time.sleep(0.01)
             
             listener.join()
+        
+        if duration[0] <= 2.0:
+            logging.info("Recording too short, discarding.")
+            return None, fs
     else:
         logging.info("Recording... Press Ctrl+C to stop.")
         try:
