@@ -4,3 +4,6 @@ scipy
 mistralai
 python-dotenv
 pynput
+pystray
+Pillow
+PyGObject
