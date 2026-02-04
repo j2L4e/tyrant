@@ -11,7 +11,12 @@ A simple application that records your microphone, transcribes the audio using M
 ## Installation
 
 1. Clone the repository.
-2. Install the required Python packages:
+2. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+3. Install the required Python packages:
    ```bash
    pip install -r requirements.txt
    ```
