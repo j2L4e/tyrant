@@ -18,9 +18,10 @@ A simple application that records your microphone, transcribes the audio using M
 
 ## Configuration
 
-Create a `.env` file in the root directory and add your Mistral AI API key:
+Create a `.env` file in the root directory and add your Mistral AI API key and optionally the model name:
 ```env
 MISTRAL_API_KEY=your_api_key_here
+MODEL_NAME=voxtral-mini-transcribe-2507
 ```
 
 ## Usage
@@ -48,5 +49,5 @@ Options:
 
 ## Notes
 
-- The default model used is `voxtral-mini-latest`.
+- The default model used is `voxtral-mini-transcribe-2507`. You can override it by setting the `MODEL` environment variable.
 - Ensure you have a window focused where you want the text to appear before the transcription finishes.
