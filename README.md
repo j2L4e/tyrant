@@ -84,3 +84,7 @@ You can easily add new methods by inheriting from the `Output` or `Transcription
 
 - The default model used is `voxtral-mini-transcribe-2507`.
 - Ensure you have a window focused where you want the text to appear before the transcription finishes (if using `xdotool`).
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
