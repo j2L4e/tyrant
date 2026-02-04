@@ -1,12 +1,18 @@
 # Tyrant
 
-A simple application that records your microphone, transcribes the audio using Mistral AI's transcription API, and types the resulting text into your active window using `xdotool`.
+A simple application that records your microphone, transcribes the audio using Mistral AI's transcription API, and types the resulting text into your active window.
+
+## Features
+
+- **Push-To-Talk (PTT):** Record only when a specific key is held.
+- **System Tray Icon:** Easy access to Mute/Unmute and Quit.
+- **Pluggable Output Methods:** Automatically detects available typing tools (like `xdotool`).
 
 ## Prerequisites
 
 - Python 3.x
-- `xdotool` (install via your package manager, e.g., `sudo apt install xdotool`)
 - PortAudio (required for `sounddevice`, e.g., `sudo apt install libportaudio2`)
+- `xdotool` (optional, for automatic typing on Linux/X11)
 
 ## Installation
 
@@ -40,19 +46,35 @@ Options:
 - `-v`, `--verbose`: Enable verbose logging.
 - `--ptt KEY`: Use push-to-talk with the specified key (e.g., `ctrl`, `shift`, `caps_lock`).
 
+### System Tray
+
+When running, a tray icon appears showing the current status (Idle, Recording, Transcribing, Muted).
+- **Right-click** the icon to Mute/Unmute or Quit the application.
+
 ### Recording Modes
 
 1. **Manual (Default):**
    - Run `python src/main.py`.
    - Recording starts immediately.
-   - Press `Ctrl+C` to stop.
+   - Press `Ctrl+C` or use the tray menu to stop.
 
 2. **Push-To-Talk (PTT):**
    - Run `python src/main.py --ptt caps_lock`.
    - The script waits for you to hold the specified key.
    - Recording starts when you press the key and stops when you release it.
 
+## Output Methods
+
+The application uses a flexible output system defined in `src/output.py`. It automatically selects the first available output method:
+
+1.  **OutputXdotool**: Uses `xdotool` to type text. (Requires `xdotool` installed).
+2.  **OutputNoop**: A fallback that only logs the transcription if no typing tool is found.
+
+### Implementing Custom Output
+
+You can easily add new output methods by inheriting from the `Output` class in `src/output.py` and implementing `is_available()` and `type(text)`.
+
 ## Notes
 
-- The default model used is `voxtral-mini-transcribe-2507`. You can override it by setting the `MODEL` environment variable.
-- Ensure you have a window focused where you want the text to appear before the transcription finishes.
+- The default model used is `voxtral-mini-transcribe-2507`.
+- Ensure you have a window focused where you want the text to appear before the transcription finishes (if using `xdotool`).

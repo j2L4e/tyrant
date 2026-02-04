@@ -10,6 +10,7 @@ import threading
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
 import main
+from output import Output, OutputXdotool, first_available_output
 
 class TestDictate(unittest.TestCase):
 
@@ -100,10 +101,66 @@ class TestDictate(unittest.TestCase):
             self.assertEqual(text, 'hello world')
             os.remove('test.wav')
 
-    @patch('main.subprocess.run')
-    def test_type_text(self, mock_run):
-        main.type_text("hello")
-        mock_run.assert_called_with(['xdotool', 'type', '--clearmodifiers', 'hello'])
+    @patch('output.subprocess.run')
+    def test_output_xdotool_type(self, mock_run):
+        out = OutputXdotool()
+        out.type("hello")
+        mock_run.assert_called_with(['xdotool', 'type', '--clearmodifiers', "hello"])
+
+    @patch('output.shutil.which')
+    def test_output_xdotool_available(self, mock_which):
+        mock_which.return_value = '/usr/bin/xdotool'
+        out = OutputXdotool()
+        self.assertTrue(out.is_available())
+        mock_which.assert_called_with('xdotool')
+
+    @patch('output.shutil.which')
+    def test_output_xdotool_not_available(self, mock_which):
+        mock_which.return_value = None
+        out = OutputXdotool()
+        self.assertFalse(out.is_available())
+
+    def test_first_available_output(self):
+        from output import OutputNoop
+        with patch('output.OutputXdotool.is_available') as mock_available:
+            # Test when OutputXdotool is available
+            mock_available.return_value = True
+            output = first_available_output()
+            self.assertIsInstance(output, OutputXdotool)
+
+            # Test when OutputXdotool is not available, should fall back to OutputNoop
+            mock_available.return_value = False
+            output = first_available_output()
+            self.assertIsInstance(output, OutputNoop)
+
+    def test_output_selection_logic(self):
+        class MockOutputAvailable(Output):
+            def is_available(self): return True
+            def type(self, text): pass
+
+        class MockOutputUnavailable(Output):
+            def is_available(self): return False
+            def type(self, text): pass
+
+        # Test selecting the first available
+        output_classes = [MockOutputUnavailable, MockOutputAvailable]
+        output = None
+        for cls in output_classes:
+            instance = cls()
+            if instance.is_available():
+                output = instance
+                break
+        self.assertIsInstance(output, MockOutputAvailable)
+
+        # Test none available
+        output_classes = [MockOutputUnavailable]
+        output = None
+        for cls in output_classes:
+            instance = cls()
+            if instance.is_available():
+                output = instance
+                break
+        self.assertIsNone(output)
 
 if __name__ == '__main__':
     unittest.main()

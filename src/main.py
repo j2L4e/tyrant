@@ -14,6 +14,7 @@ from pynput import keyboard
 import pystray
 from pystray import MenuItem as item
 from tray import create_idle_icon, create_muted_icon, create_recording_icon, create_transcribing_icon
+from output import first_available_output
 
 def setup_logging(verbose):
     level = logging.DEBUG if verbose else logging.INFO
@@ -135,11 +136,8 @@ def transcribe_audio(file_path):
     logging.debug(f"API Response: {response}")
     return response.text
 
-def type_text(text):
-    logging.info(f"Typing: {text}")
-    subprocess.run(['xdotool', 'type', '--clearmodifiers', text])
 
-def run_transcription_loop(args, tray_icon, icons, stop_event, muted):
+def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output):
     while not stop_event.is_set():
         try:
             if muted.is_set():
@@ -162,7 +160,7 @@ def run_transcription_loop(args, tray_icon, icons, stop_event, muted):
             if tray_icon and icons:
                 tray_icon.icon = icons['idle']
             logging.info(f"Transcribed text: {text}")
-            type_text(text)
+            output.type(text)
             os.unlink(temp_wav)
             logging.debug(f"Deleted temporary file {temp_wav}")
             
@@ -222,8 +220,10 @@ def main():
     )
     icon = pystray.Icon("Tyrant", icons['idle'], "Tyrant", menu)
 
+    output = first_available_output()
+
     # Start transcription in a separate thread
-    transcription_thread = threading.Thread(target=run_transcription_loop, args=(args, icon, icons, stop_event, muted))
+    transcription_thread = threading.Thread(target=run_transcription_loop, args=(args, icon, icons, stop_event, muted, output))
     transcription_thread.daemon = True
     transcription_thread.start()
 
