@@ -1,4 +1,4 @@
-# Mistral Dictate
+# Tyrant
 
 A simple application that records your microphone, transcribes the audio using Mistral AI's transcription API, and types the resulting text into your active window using `xdotool`.
 
