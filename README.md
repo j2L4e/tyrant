@@ -33,7 +33,7 @@ A simple application that records your microphone, transcribes the audio using M
 Create a `.env` file in the root directory and add your Mistral AI API key and optionally the model name:
 ```env
 MISTRAL_API_KEY=your_api_key_here
-MODEL_NAME=voxtral-mini-transcribe-2507
+MISTRAL_MODEL=voxtral-mini-transcribe-2507
 ```
 
 ## Usage

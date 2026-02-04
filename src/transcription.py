@@ -24,7 +24,7 @@ class TranscriptionMistral(Transcription):
 
     def __init__(self, api_key: str = None, model_name: str = "voxtral-mini-transcribe-2507"):
         self.api_key = api_key or os.getenv("MISTRAL_API_KEY")
-        self.model_name = model_name or os.getenv("MODEL_NAME")
+        self.model_name = model_name or os.getenv("MISTRAL_MODEL")
 
     def is_available(self) -> bool:
         return bool(self.api_key)
