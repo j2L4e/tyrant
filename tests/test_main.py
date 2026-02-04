@@ -11,6 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src'
 
 import main
 from output import Output, OutputXdotool, first_available_output
+from transcription import Transcription, TranscriptionMistral, first_available_transcription
 
 class TestDictate(unittest.TestCase):
 
@@ -83,7 +84,7 @@ class TestDictate(unittest.TestCase):
         self.assertIsNotNone(audio_data)
         self.assertTrue(len(audio_data) > 0)
 
-    @patch('main.Mistral')
+    @patch('transcription.Mistral')
     def test_transcribe_audio(self, mock_mistral):
         mock_client = MagicMock()
         mock_response = MagicMock()
@@ -92,14 +93,14 @@ class TestDictate(unittest.TestCase):
         mock_client.audio.transcriptions.complete.return_value = mock_response
         mock_mistral.return_value = mock_client
         
-        with patch('main.MISTRAL_API_KEY', 'fake_key'):
-            # Create a dummy file
-            with open('test.wav', 'w') as f:
-                f.write('dummy content')
-            
-            text = main.transcribe_audio('test.wav')
-            self.assertEqual(text, 'hello world')
-            os.remove('test.wav')
+        trans = TranscriptionMistral(api_key='fake_key')
+        # Create a dummy file
+        with open('test.wav', 'w') as f:
+            f.write('dummy content')
+        
+        text = trans.transcribe('test.wav')
+        self.assertEqual(text, 'hello world')
+        os.remove('test.wav')
 
     @patch('output.subprocess.run')
     def test_output_xdotool_type(self, mock_run):
@@ -161,6 +162,38 @@ class TestDictate(unittest.TestCase):
                 output = instance
                 break
         self.assertIsNone(output)
+
+    def test_first_available_transcription(self):
+        from transcription import TranscriptionNoop
+        with patch('transcription.TranscriptionMistral.is_available') as mock_available:
+            # Test when TranscriptionMistral is available
+            mock_available.return_value = True
+            trans = first_available_transcription()
+            self.assertIsInstance(trans, TranscriptionMistral)
+
+            # Test when TranscriptionMistral is not available, should fall back to TranscriptionNoop
+            mock_available.return_value = False
+            trans = first_available_transcription()
+            self.assertIsInstance(trans, TranscriptionNoop)
+
+    def test_transcription_selection_logic(self):
+        class MockTransAvailable(Transcription):
+            def is_available(self): return True
+            def transcribe(self, file_path): return "ok"
+
+        class MockTransUnavailable(Transcription):
+            def is_available(self): return False
+            def transcribe(self, file_path): return "no"
+
+        # Test selecting the first available
+        trans_classes = [MockTransUnavailable, MockTransAvailable]
+        trans = None
+        for cls in trans_classes:
+            instance = cls()
+            if instance.is_available():
+                trans = instance
+                break
+        self.assertIsInstance(trans, MockTransAvailable)
 
 if __name__ == '__main__':
     unittest.main()

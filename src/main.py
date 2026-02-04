@@ -15,15 +15,13 @@ import pystray
 from pystray import MenuItem as item
 from tray import create_idle_icon, create_muted_icon, create_recording_icon, create_transcribing_icon
 from output import first_available_output
+from transcription import first_available_transcription
 
 def setup_logging(verbose):
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(level=level, format='%(levelname)s: %(message)s')
 
 load_dotenv()
-
-MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME", "voxtral-mini-transcribe-2507")
 
 def record_audio(fs=16000, ptt_key=None, tray_icon=None, icons=None, muted=None):
     """
@@ -117,27 +115,7 @@ def save_temp_wav(data, fs):
     logging.debug(f"Saved temporary audio to {temp_file.name}")
     return temp_file.name
 
-def transcribe_audio(file_path):
-    if not MISTRAL_API_KEY:
-        raise ValueError("MISTRAL_API_KEY not found in environment variables")
-    
-    logging.debug(f"Sending request to Mistral API for file: {file_path}")
-    client = Mistral(api_key=MISTRAL_API_KEY)
-    
-    with open(file_path, 'rb') as f:
-        response = client.audio.transcriptions.complete(
-            model=MODEL_NAME,
-            file={
-                "content": f,
-                "file_name": os.path.basename(file_path),
-            }
-        )
-    
-    logging.debug(f"API Response: {response}")
-    return response.text
-
-
-def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output):
+def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output, transcription):
     while not stop_event.is_set():
         try:
             if muted.is_set():
@@ -156,7 +134,7 @@ def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output):
             logging.info("Transcribing...")
             if tray_icon and icons:
                 tray_icon.icon = icons['transcribing']
-            text = transcribe_audio(temp_wav)
+            text = transcription.transcribe(temp_wav)
             if tray_icon and icons:
                 tray_icon.icon = icons['idle']
             logging.info(f"Transcribed text: {text}")
@@ -221,9 +199,10 @@ def main():
     icon = pystray.Icon("Tyrant", icons['idle'], "Tyrant", menu)
 
     output = first_available_output()
+    transcription = first_available_transcription()
 
     # Start transcription in a separate thread
-    transcription_thread = threading.Thread(target=run_transcription_loop, args=(args, icon, icons, stop_event, muted, output))
+    transcription_thread = threading.Thread(target=run_transcription_loop, args=(args, icon, icons, stop_event, muted, output, transcription))
     transcription_thread.daemon = True
     transcription_thread.start()
 

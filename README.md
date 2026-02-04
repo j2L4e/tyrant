@@ -6,13 +6,14 @@ A simple application that records your microphone, transcribes the audio using M
 
 - **Push-To-Talk (PTT):** Record only when a specific key is held.
 - **System Tray Icon:** Easy access to Mute/Unmute and Quit.
-- **Pluggable Output Methods:** Automatically detects available typing tools (like `xdotool`).
+- **Pluggable Output & Transcription Methods:** Automatically detects available tools for typing and transcription.
 
 ## Prerequisites
 
 - Python 3.x
 - PortAudio (required for `sounddevice`, e.g., `sudo apt install libportaudio2`)
 - `xdotool` (optional, for automatic typing on Linux/X11)
+- Mistral API Key (optional, if using Mistral transcription)
 
 ## Installation
 
@@ -63,16 +64,21 @@ When running, a tray icon appears showing the current status (Idle, Recording, T
    - The script waits for you to hold the specified key.
    - Recording starts when you press the key and stops when you release it.
 
-## Output Methods
+## Output & Transcription Methods
 
-The application uses a flexible output system defined in `src/output.py`. It automatically selects the first available output method:
+The application uses a flexible system for both output and transcription, defined in `src/output.py` and `src/transcription.py`. It automatically selects the first available method for each:
 
+### Output Methods
 1.  **OutputXdotool**: Uses `xdotool` to type text. (Requires `xdotool` installed).
 2.  **OutputNoop**: A fallback that only logs the transcription if no typing tool is found.
 
-### Implementing Custom Output
+### Transcription Methods
+1.  **TranscriptionMistral**: Uses Mistral AI's API. (Requires `MISTRAL_API_KEY` in `.env`).
+2.  **TranscriptionNoop**: A fallback that returns a placeholder string if no transcription service is configured.
 
-You can easily add new output methods by inheriting from the `Output` class in `src/output.py` and implementing `is_available()` and `type(text)`.
+### Implementing Custom Methods
+
+You can easily add new methods by inheriting from the `Output` or `Transcription` base classes and implementing the required interface (`is_available()` and `type(text)` or `transcribe(file_path)`).
 
 ## Notes
 
