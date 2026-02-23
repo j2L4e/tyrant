@@ -1,6 +1,7 @@
 import os
 import logging
 from mistralai import Mistral
+from mistralai.models import File
 
 class Transcription:
     """
@@ -32,19 +33,19 @@ class TranscriptionMistral(Transcription):
     def transcribe(self, file_path: str) -> str:
         if not self.api_key:
             raise ValueError("MISTRAL_API_KEY not found")
-        
+
         logging.debug(f"Sending request to Mistral API for file: {file_path}")
         client = Mistral(api_key=self.api_key)
-        
+
         with open(file_path, 'rb') as f:
             response = client.audio.transcriptions.complete(
                 model=self.model_name,
-                file={
-                    "content": f,
-                    "file_name": os.path.basename(file_path),
-                }
+                file=File(
+                    content=f.read(),
+                    file_name=os.path.basename(file_path),
+                )
             )
-        
+
         logging.debug(f"API Response: {response}")
         return response.text
 
