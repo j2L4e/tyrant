@@ -3,6 +3,7 @@ import logging
 from mistralai import Mistral
 from mistralai.models import File
 
+
 class Transcription:
     """
     Interface for transcription classes.
@@ -47,8 +48,7 @@ class TranscriptionMistral(Transcription):
             )
 
         logging.debug(f"API Response: {response}")
-        return response.text
-
+        return response.text.replace(" slash ", "/")
 
 class TranscriptionNoop(Transcription):
     """
