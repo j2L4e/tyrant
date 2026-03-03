@@ -16,6 +16,7 @@ from pystray import MenuItem as item
 from tray import create_idle_icon, create_muted_icon, create_recording_icon, create_transcribing_icon
 from output import first_available_output
 from transcription import first_available_transcription
+from notification import first_available_notification
 
 def setup_logging(verbose):
     level = logging.DEBUG if verbose else logging.INFO
@@ -115,7 +116,7 @@ def save_temp_wav(data, fs):
     logging.debug(f"Saved temporary audio to {temp_file.name}")
     return temp_file.name
 
-def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output, transcription):
+def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output, transcription, notification):
     while not stop_event.is_set():
         try:
             if muted.is_set():
@@ -148,7 +149,8 @@ def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output, tr
             logging.info("Exiting transcription loop...")
             break
         except Exception as e:
-            logging.error(f"Error: {e}")
+            logging.error(f"{e}")
+            notification.notify("Error", f"{e}")
             if not args.ptt:
                 break
     
@@ -200,9 +202,10 @@ def main():
 
     output = first_available_output()
     transcription = first_available_transcription()
+    notification = first_available_notification()
 
     # Start transcription in a separate thread
-    transcription_thread = threading.Thread(target=run_transcription_loop, args=(args, icon, icons, stop_event, muted, output, transcription))
+    transcription_thread = threading.Thread(target=run_transcription_loop, args=(args, icon, icons, stop_event, muted, output, transcription, notification))
     transcription_thread.daemon = True
     transcription_thread.start()
 

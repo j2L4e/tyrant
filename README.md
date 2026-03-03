@@ -6,13 +6,14 @@ A simple application that records your microphone, transcribes the audio using M
 
 - **Push-To-Talk (PTT):** Record only when a specific key is held.
 - **System Tray Icon:** Easy access to Mute/Unmute and Quit.
-- **Pluggable Output & Transcription Methods:** Automatically detects available tools for typing and transcription.
+- **Pluggable Output, Transcription & Notification Methods:** Automatically detects available tools for typing, transcription, and system notifications.
 
 ## Prerequisites
 
 - Python 3.x
 - PortAudio (required for `sounddevice`, e.g., `sudo apt install libportaudio2`)
 - `xdotool` (optional, for automatic typing on Linux/X11)
+- `notify-send` (optional, for system notifications on Linux)
 - Mistral API Key (optional, if using Mistral transcription)
 
 ## Installation
@@ -64,9 +65,9 @@ When running, a tray icon appears showing the current status (Idle, Recording, T
    - The script waits for you to hold the specified key.
    - Recording starts when you press the key and stops when you release it.
 
-## Output & Transcription Methods
+## Output, Transcription & Notification Methods
 
-The application uses a flexible system for both output and transcription, defined in `src/output.py` and `src/transcription.py`. It automatically selects the first available method for each:
+The application uses a flexible system for output, transcription, and notifications, defined in `src/output.py`, `src/transcription.py`, and `src/notification.py`. It automatically selects the first available method for each:
 
 ### Output Methods
 1.  **OutputXdotool**: Uses `xdotool` to type text. (Requires `xdotool` installed).
@@ -76,9 +77,13 @@ The application uses a flexible system for both output and transcription, define
 1.  **TranscriptionMistral**: Uses Mistral AI's API. (Requires `MISTRAL_API_KEY` in `.env`).
 2.  **TranscriptionNoop**: A fallback that returns a placeholder string if no transcription service is configured.
 
+### Notification Methods
+1.  **NotificationNotifySend**: Uses `notify-send` to show system notifications. (Requires `libnotify-bin` or equivalent).
+2.  **NotificationNoop**: A fallback that only logs notifications if no notification tool is found.
+
 ### Implementing Custom Methods
 
-You can easily add new methods by inheriting from the `Output` or `Transcription` base classes and implementing the required interface (`is_available()` and `type(text)` or `transcribe(file_path)`).
+You can easily add new methods by inheriting from the `Output`, `Transcription`, or `Notification` base classes and implementing the required interface (`is_available()` and `type(text)`, `transcribe(file_path)`, or `notify(title, message)`).
 
 ## Notes
 
