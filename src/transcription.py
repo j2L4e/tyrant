@@ -48,7 +48,7 @@ class TranscriptionMistral(Transcription):
             )
 
         logging.debug(f"API Response: {response}")
-        return response.text.replace(" slash ", "/")
+        return response.text.replace(" slash ", "/").replace(" dot ", "/")
 
 class TranscriptionNoop(Transcription):
     """
