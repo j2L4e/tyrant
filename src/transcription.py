@@ -27,6 +27,7 @@ class TranscriptionMistral(Transcription):
     def __init__(self, api_key: str = None, model_name: str = None):
         self.api_key = api_key or os.getenv("MISTRAL_API_KEY")
         self.model_name = model_name or os.getenv("MISTRAL_MODEL")
+        self.context_bias = os.getenv("MISTRAL_CONTEXT_BIAS").split(",") if os.getenv("MISTRAL_CONTEXT_BIAS") else []
 
     def is_available(self) -> bool:
         return bool(self.api_key)
@@ -44,7 +45,8 @@ class TranscriptionMistral(Transcription):
                 file=File(
                     content=f.read(),
                     file_name=os.path.basename(file_path),
-                )
+                ),
+                context_bias=self.context_bias
             )
 
         logging.debug(f"API Response: {response}")

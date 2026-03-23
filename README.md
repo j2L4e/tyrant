@@ -31,11 +31,14 @@ A simple application that records your microphone, transcribes the audio using M
 
 ## Configuration
 
-Create a `.env` file in the root directory and add your Mistral AI API key and optionally the model name:
+Create a `.env` file in the root directory and add your Mistral AI API key and optionally the model name. You can also provide a comma-separated list of context bias terms to help the transcriber prefer specific words (e.g., product names, acronyms):
 ```env
 MISTRAL_API_KEY=your_api_key_here
 MISTRAL_MODEL=voxtral-mini-transcribe-2507
+MISTRAL_CONTEXT_BIAS=Kubernetes,K8s,PostgreSQL
 ```
+
+- `MISTRAL_CONTEXT_BIAS` is optional. When set, Tyrant passes these terms to Mistral as a context bias so the transcript is more likely to include them as spoken. Use a short, focused list; terms are case-sensitive and separated by commas.
 
 ## Usage
 

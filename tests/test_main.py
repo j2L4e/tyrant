@@ -93,14 +93,23 @@ class TestDictate(unittest.TestCase):
         mock_client.audio.transcriptions.complete.return_value = mock_response
         mock_mistral.return_value = mock_client
         
-        trans = TranscriptionMistral(api_key='fake_key')
-        # Create a dummy file
-        with open('test.wav', 'w') as f:
-            f.write('dummy content')
-        
-        text = trans.transcribe('test.wav')
-        self.assertEqual(text, 'hello world')
-        os.remove('test.wav')
+        with patch.dict(os.environ, {"MISTRAL_CONTEXT_BIAS": "term1,term2"}):
+            trans = TranscriptionMistral(api_key='fake_key')
+            self.assertEqual(trans.context_bias, ["term1", "term2"])
+            
+            # Create a dummy file
+            with open('test.wav', 'w') as f:
+                f.write('dummy content')
+            
+            text = trans.transcribe('test.wav')
+            self.assertEqual(text, 'hello world')
+            
+            # Verify context_bias was passed to the API call
+            mock_client.audio.transcriptions.complete.assert_called()
+            args, kwargs = mock_client.audio.transcriptions.complete.call_args
+            self.assertEqual(kwargs.get('context_bias'), ["term1", "term2"])
+            
+            os.remove('test.wav')
 
     @patch('output.subprocess.run')
     def test_output_xdotool_type(self, mock_run):
