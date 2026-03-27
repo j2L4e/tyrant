@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src'
 
 import main
 from output import Output, OutputXdotool, first_available_output
-from transcription import Transcription, TranscriptionMistral, first_available_transcription
+from transcription import Transcription, TranscriptionMistral, TranscriptionWhisper, first_available_transcription
 
 class TestDictate(unittest.TestCase):
 
@@ -172,18 +172,61 @@ class TestDictate(unittest.TestCase):
                 break
         self.assertIsNone(output)
 
+    @patch('scipy.io.wavfile.read')
+    def test_whisper_transcribe(self, mock_wavfile_read):
+        mock_wavfile_read.return_value = (16000, np.zeros((16000,), dtype=np.float32))
+
+        mock_segment_1 = MagicMock()
+        mock_segment_1.text = " Hello"
+        mock_segment_2 = MagicMock()
+        mock_segment_2.text = " world."
+
+        mock_info = MagicMock()
+        mock_info.language = "en"
+        mock_info.language_probability = 0.98
+
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = (iter([mock_segment_1, mock_segment_2]), mock_info)
+
+        whisper = TranscriptionWhisper()
+        whisper._model = mock_model
+
+        result = whisper.transcribe("test.wav")
+        self.assertEqual(result, "Hello world.")
+
+    def test_whisper_lazy_model_loading(self):
+        whisper = TranscriptionWhisper()
+        self.assertIsNone(whisper._model)
+
+    def test_whisper_env_config(self):
+        with patch.dict(os.environ, {
+            "WHISPER_MODEL": "large-v3",
+            "WHISPER_DEVICE": "cuda",
+            "WHISPER_COMPUTE_TYPE": "float16",
+        }):
+            whisper = TranscriptionWhisper()
+            self.assertEqual(whisper.model_size, "large-v3")
+            self.assertEqual(whisper.device, "cuda")
+            self.assertEqual(whisper.compute_type, "float16")
+
+    def test_whisper_priority_over_mistral(self):
+        with patch.object(TranscriptionWhisper, 'is_available', return_value=True):
+            trans = first_available_transcription()
+            self.assertIsInstance(trans, TranscriptionWhisper)
+
     def test_first_available_transcription(self):
         from transcription import TranscriptionNoop
-        with patch('transcription.TranscriptionMistral.is_available') as mock_available:
-            # Test when TranscriptionMistral is available
-            mock_available.return_value = True
-            trans = first_available_transcription()
-            self.assertIsInstance(trans, TranscriptionMistral)
+        with patch.object(TranscriptionWhisper, 'is_available', return_value=False):
+            with patch('transcription.TranscriptionMistral.is_available') as mock_available:
+                # Test when TranscriptionMistral is available
+                mock_available.return_value = True
+                trans = first_available_transcription()
+                self.assertIsInstance(trans, TranscriptionMistral)
 
-            # Test when TranscriptionMistral is not available, should fall back to TranscriptionNoop
-            mock_available.return_value = False
-            trans = first_available_transcription()
-            self.assertIsInstance(trans, TranscriptionNoop)
+                # Test when TranscriptionMistral is not available, should fall back to TranscriptionNoop
+                mock_available.return_value = False
+                trans = first_available_transcription()
+                self.assertIsInstance(trans, TranscriptionNoop)
 
     def test_transcription_selection_logic(self):
         class MockTransAvailable(Transcription):

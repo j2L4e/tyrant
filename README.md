@@ -40,6 +40,21 @@ MISTRAL_CONTEXT_BIAS=Kubernetes,K8s,PostgreSQL
 
 - `MISTRAL_CONTEXT_BIAS` is optional. When set, Tyrant passes these terms to Mistral as a context bias so the transcript is more likely to include them as spoken. Use a short, focused list; terms are case-sensitive and separated by commas.
 
+### Whisper (Local) Configuration
+
+When `faster-whisper` is installed, local transcription is used by default (no API key required). Configure it with optional `.env` variables:
+```env
+WHISPER_MODEL=base
+WHISPER_DEVICE=auto
+WHISPER_COMPUTE_TYPE=auto
+```
+
+- `WHISPER_MODEL`: Model size — `tiny`, `base`, `small`, `medium`, `large-v3` (default: `base`). Larger models are more accurate but slower and use more memory.
+- `WHISPER_DEVICE`: `auto`, `cpu`, or `cuda` (default: `auto`).
+- `WHISPER_COMPUTE_TYPE`: `auto`, `float16`, `int8`, `int8_float16` (default: `auto`).
+
+The model is downloaded automatically on first use.
+
 ## Usage
 
 Run the application:
@@ -77,8 +92,9 @@ The application uses a flexible system for output, transcription, and notificati
 2.  **OutputNoop**: A fallback that only logs the transcription if no typing tool is found.
 
 ### Transcription Methods
-1.  **TranscriptionMistral**: Uses Mistral AI's API. (Requires `MISTRAL_API_KEY` in `.env`).
-2.  **TranscriptionNoop**: A fallback that returns a placeholder string if no transcription service is configured.
+1.  **TranscriptionWhisper**: Local transcription using [faster-whisper](https://github.com/SYSTRAN/faster-whisper). (Requires `faster-whisper` installed, no API key needed).
+2.  **TranscriptionMistral**: Uses Mistral AI's API. (Requires `MISTRAL_API_KEY` in `.env`).
+3.  **TranscriptionNoop**: A fallback that returns a placeholder string if no transcription service is configured.
 
 ### Notification Methods
 1.  **NotificationNotifySend**: Uses `notify-send` to show system notifications. (Requires `libnotify-bin` or equivalent).
