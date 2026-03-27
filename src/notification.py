@@ -43,11 +43,33 @@ class NotificationNoop(Notification):
         logging.info(f"Notification noop: {title} - {message}")
 
 
-def first_available_notification():
+NOTIFICATION_MODULES = {
+    "notify-send": NotificationNotifySend,
+    "noop": NotificationNoop,
+}
+
+
+def use_notification(forced=None):
     """
     Check for available notification methods and return the first one found.
-    Returns None if no notification method is available.
+    If forced is set, use that module or raise an error.
     """
+    if forced:
+        forced = forced.lower()
+        if forced not in NOTIFICATION_MODULES:
+            raise RuntimeError(
+                f"Unknown notification module '{forced}'. "
+                f"Available: {', '.join(NOTIFICATION_MODULES)}"
+            )
+        instance = NOTIFICATION_MODULES[forced]()
+        if not instance.is_available():
+            raise RuntimeError(
+                f"Notification module '{forced}' is not available. "
+                f"Check its dependencies."
+            )
+        logging.info(f"Using {instance.__class__.__name__} for notifications (forced).")
+        return instance
+
     notification_classes = [
         NotificationNotifySend,
         NotificationNoop

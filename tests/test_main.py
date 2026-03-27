@@ -10,8 +10,8 @@ import threading
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
 import main
-from output import Output, OutputXdotool, first_available_output
-from transcription import Transcription, TranscriptionMistral, TranscriptionWhisper, first_available_transcription
+from output import Output, OutputXdotool, use_output
+from transcription import Transcription, TranscriptionMistral, TranscriptionWhisper, use_transcription
 
 class TestDictate(unittest.TestCase):
 
@@ -130,17 +130,17 @@ class TestDictate(unittest.TestCase):
         out = OutputXdotool()
         self.assertFalse(out.is_available())
 
-    def test_first_available_output(self):
+    def test_use_output(self):
         from output import OutputNoop
         with patch('output.OutputXdotool.is_available') as mock_available:
             # Test when OutputXdotool is available
             mock_available.return_value = True
-            output = first_available_output()
+            output = use_output()
             self.assertIsInstance(output, OutputXdotool)
 
             # Test when OutputXdotool is not available, should fall back to OutputNoop
             mock_available.return_value = False
-            output = first_available_output()
+            output = use_output()
             self.assertIsInstance(output, OutputNoop)
 
     def test_output_selection_logic(self):
@@ -211,21 +211,21 @@ class TestDictate(unittest.TestCase):
 
     def test_whisper_priority_over_mistral(self):
         with patch.object(TranscriptionWhisper, 'is_available', return_value=True):
-            trans = first_available_transcription()
+            trans = use_transcription()
             self.assertIsInstance(trans, TranscriptionWhisper)
 
-    def test_first_available_transcription(self):
+    def test_use_transcription(self):
         from transcription import TranscriptionNoop
         with patch.object(TranscriptionWhisper, 'is_available', return_value=False):
             with patch('transcription.TranscriptionMistral.is_available') as mock_available:
                 # Test when TranscriptionMistral is available
                 mock_available.return_value = True
-                trans = first_available_transcription()
+                trans = use_transcription()
                 self.assertIsInstance(trans, TranscriptionMistral)
 
                 # Test when TranscriptionMistral is not available, should fall back to TranscriptionNoop
                 mock_available.return_value = False
-                trans = first_available_transcription()
+                trans = use_transcription()
                 self.assertIsInstance(trans, TranscriptionNoop)
 
     def test_transcription_selection_logic(self):

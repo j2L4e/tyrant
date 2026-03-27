@@ -85,24 +85,36 @@ When running, a tray icon appears showing the current status (Idle, Recording, T
 
 ## Output, Transcription & Notification Methods
 
-The application uses a flexible system for output, transcription, and notifications, defined in `src/output.py`, `src/transcription.py`, and `src/notification.py`. It automatically selects the first available method for each:
+The application uses a flexible system for output, transcription, and notifications, defined in `src/output.py`, `src/transcription.py`, and `src/notification.py`. It automatically selects the first available method for each.
+
+### Forcing a Specific Module
+
+You can force a specific module via environment variables. If the forced module is not available (missing dependencies, missing API key, etc.), Tyrant will exit with an error on startup.
+
+```env
+TRANSCRIPTION=whisper    # or: mistral, noop
+OUTPUT=xdotool           # or: noop
+NOTIFICATION=notify-send # or: noop
+```
+
+When these variables are not set, the first available module is used automatically (see priority order below).
 
 ### Output Methods
-1.  **OutputXdotool**: Uses `xdotool` to type text. (Requires `xdotool` installed).
-2.  **OutputNoop**: A fallback that only logs the transcription if no typing tool is found.
+1.  **xdotool**: Uses `xdotool` to type text. (Requires `xdotool` installed).
+2.  **noop**: A fallback that only logs the transcription if no typing tool is found.
 
 ### Transcription Methods
-1.  **TranscriptionWhisper**: Local transcription using [faster-whisper](https://github.com/SYSTRAN/faster-whisper). (Requires `faster-whisper` installed, no API key needed).
-2.  **TranscriptionMistral**: Uses Mistral AI's API. (Requires `MISTRAL_API_KEY` in `.env`).
-3.  **TranscriptionNoop**: A fallback that returns a placeholder string if no transcription service is configured.
+1.  **whisper**: Local transcription using [faster-whisper](https://github.com/SYSTRAN/faster-whisper). (Requires `faster-whisper` installed, no API key needed).
+2.  **mistral**: Uses Mistral AI's API. (Requires `MISTRAL_API_KEY` in `.env`).
+3.  **noop**: A fallback that returns a placeholder string if no transcription service is configured.
 
 ### Notification Methods
-1.  **NotificationNotifySend**: Uses `notify-send` to show system notifications. (Requires `libnotify-bin` or equivalent).
-2.  **NotificationNoop**: A fallback that only logs notifications if no notification tool is found.
+1.  **notify-send**: Uses `notify-send` to show system notifications. (Requires `libnotify-bin` or equivalent).
+2.  **noop**: A fallback that only logs notifications if no notification tool is found.
 
 ### Implementing Custom Methods
 
-You can easily add new methods by inheriting from the `Output`, `Transcription`, or `Notification` base classes and implementing the required interface (`is_available()` and `type(text)`, `transcribe(file_path)`, or `notify(title, message)`).
+You can easily add new methods by inheriting from the `Output`, `Transcription`, or `Notification` base classes and implementing the required interface (`is_available()` and `type(text)`, `transcribe(file_path)`, or `notify(title, message)`). Register the new class in the corresponding `*_MODULES` dict to make it available via the env var.
 
 ## Notes
 

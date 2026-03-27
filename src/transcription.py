@@ -137,10 +137,35 @@ class TranscriptionNoop(Transcription):
         return "[No transcription available]"
 
 
-def first_available_transcription():
+TRANSCRIPTION_MODULES = {
+    "whisper": TranscriptionWhisper,
+    "mistral": TranscriptionMistral,
+    "noop": TranscriptionNoop,
+}
+
+
+def use_transcription(forced=None):
     """
     Check for available transcription methods and return the first one found.
+    If forced is set, use that module or raise an error.
     """
+    if forced:
+        forced = forced.lower()
+        if forced not in TRANSCRIPTION_MODULES:
+            raise RuntimeError(
+                f"Unknown transcription module '{forced}'. "
+                f"Available: {', '.join(TRANSCRIPTION_MODULES)}"
+            )
+        instance = TRANSCRIPTION_MODULES[forced]()
+        if not instance.is_available():
+            raise RuntimeError(
+                f"Transcription module '{forced}' is not available. "
+                f"Check its dependencies."
+            )
+        logging.info(f"Using {instance.__class__.__name__} for transcription (forced).")
+        instance.init()
+        return instance
+
     transcription_classes = [
         TranscriptionWhisper,
         TranscriptionMistral,

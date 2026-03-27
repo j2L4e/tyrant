@@ -43,11 +43,33 @@ class OutputNoop(Output):
         logging.info(f"Typing with noop: {text}")
 
 
-def first_available_output():
+OUTPUT_MODULES = {
+    "xdotool": OutputXdotool,
+    "noop": OutputNoop,
+}
+
+
+def use_output(forced=None):
     """
     Check for available output methods and return the first one found.
-    Returns None if no output method is available.
+    If forced is set, use that module or raise an error.
     """
+    if forced:
+        forced = forced.lower()
+        if forced not in OUTPUT_MODULES:
+            raise RuntimeError(
+                f"Unknown output module '{forced}'. "
+                f"Available: {', '.join(OUTPUT_MODULES)}"
+            )
+        instance = OUTPUT_MODULES[forced]()
+        if not instance.is_available():
+            raise RuntimeError(
+                f"Output module '{forced}' is not available. "
+                f"Check its dependencies."
+            )
+        logging.info(f"Using {instance.__class__.__name__} for output (forced).")
+        return instance
+
     output_classes = [
         OutputXdotool,
         OutputNoop

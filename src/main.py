@@ -3,8 +3,6 @@ import numpy as np
 import scipy.io.wavfile as wav
 import tempfile
 import os
-from mistralai import Mistral
-import subprocess
 from dotenv import load_dotenv
 import time
 import logging
@@ -14,9 +12,9 @@ from pynput import keyboard
 import pystray
 from pystray import MenuItem as item
 from tray import create_idle_icon, create_muted_icon, create_recording_icon, create_transcribing_icon
-from output import first_available_output
-from transcription import first_available_transcription
-from notification import first_available_notification
+from output import use_output
+from transcription import use_transcription
+from notification import use_notification
 
 def setup_logging(verbose):
     level = logging.DEBUG if verbose else logging.INFO
@@ -200,9 +198,9 @@ def main():
     )
     icon = pystray.Icon("Tyrant", icons['idle'], "Tyrant", menu)
 
-    output = first_available_output()
-    transcription = first_available_transcription()
-    notification = first_available_notification()
+    output = use_output(os.getenv("OUTPUT"))
+    transcription = use_transcription(os.getenv("TRANSCRIPTION"))
+    notification = use_notification(os.getenv("NOTIFICATION"))
 
     # Start transcription in a separate thread
     transcription_thread = threading.Thread(target=run_transcription_loop, args=(args, icon, icons, stop_event, muted, output, transcription, notification))

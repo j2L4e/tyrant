@@ -6,7 +6,7 @@ import sys
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
-from notification import Notification, NotificationNotifySend, NotificationNoop, first_available_notification
+from notification import Notification, NotificationNotifySend, NotificationNoop, use_notification
 
 class TestNotification(unittest.TestCase):
 
@@ -35,16 +35,16 @@ class TestNotification(unittest.TestCase):
         # Should not raise any error
         notify.notify("Title", "Message")
 
-    def test_first_available_notification(self):
+    def test_use_notification(self):
         with patch('notification.NotificationNotifySend.is_available') as mock_available:
             # Test when NotificationNotifySend is available
             mock_available.return_value = True
-            notify = first_available_notification()
+            notify = use_notification()
             self.assertIsInstance(notify, NotificationNotifySend)
 
             # Test when NotificationNotifySend is not available, should fall back to NotificationNoop
             mock_available.return_value = False
-            notify = first_available_notification()
+            notify = use_notification()
             self.assertIsInstance(notify, NotificationNoop)
 
 if __name__ == '__main__':
