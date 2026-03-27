@@ -1,12 +1,23 @@
 # Tyrant — Dictate anywhere
 
-A simple application that records your microphone, transcribes the audio using Mistral AI's transcription API, and types the resulting text into your active window.
+A cross-platform speech-to-text dictation app. Tyrant records your microphone, transcribes the audio, and types the result into your active window. Its pluggable module system makes it easy to support new platforms — each OS-specific concern (typing, notifications, transcription) is isolated behind an interface, so adding support for a new platform means implementing a small module rather than rewriting the app.
+
+### Modules
+
+Tyrant uses three module types, each with a base class and one or more implementations. The first available implementation is selected automatically at startup.
+
+| Module | What it does | Implementations (by priority) |
+|---|---|---|
+| **Transcription** | Converts recorded audio to text | `whisper` — local inference via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) · `mistral` — Mistral AI API · `noop` — placeholder |
+| **Output** | Types the transcribed text into the active window | `xdotool` — Linux/X11 · `noop` — logs only |
+| **Notification** | Shows status notifications to the user | `notify-send` — Linux (libnotify) · `noop` — logs only |
+
+You can force a specific implementation via environment variable (`TRANSCRIPTION`, `OUTPUT`, `NOTIFICATION`). See [Forcing a Specific Module](#forcing-a-specific-module) below.
 
 ## Features
 
 - **Push-To-Talk (PTT):** Record only when a specific key is held.
 - **System Tray Icon:** Easy access to Mute/Unmute and Quit.
-- **Pluggable Output, Transcription & Notification Methods:** Automatically detects available tools for typing, transcription, and system notifications.
 
 ## Prerequisites
 
