@@ -1,8 +1,12 @@
 import os
 import logging
 import importlib.util
-from mistralai import Mistral
-from mistralai.models import File
+
+try:
+    from mistralai import Mistral
+    from mistralai.models import File
+except ImportError:  # mistralai missing: the Mistral module is simply unavailable
+    Mistral = File = None
 
 
 def load_wav_float32(file_path: str):
@@ -155,7 +159,7 @@ class TranscriptionMistral(Transcription):
         self.context_bias = os.getenv("MISTRAL_CONTEXT_BIAS").split(",") if os.getenv("MISTRAL_CONTEXT_BIAS") else []
 
     def is_available(self) -> bool:
-        return bool(self.api_key)
+        return Mistral is not None and bool(self.api_key)
 
     def transcribe(self, file_path: str) -> str:
         if not self.api_key:

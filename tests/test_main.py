@@ -290,6 +290,10 @@ class TestDictate(unittest.TestCase):
         with patch.object(TranscriptionWhisper, 'is_available', return_value=True):
             self.assertIsInstance(use_transcription(), TranscriptionWhisperCpp)
 
+    def test_mistral_unavailable_without_package(self):
+        with patch('transcription.Mistral', None):
+            self.assertFalse(TranscriptionMistral(api_key="key").is_available())
+
     def test_transcription_selection_logic(self):
         class MockTransAvailable(Transcription):
             def is_available(self): return True

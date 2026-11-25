@@ -1,0 +1,9 @@
+# Recording, tray icon and configuration; always needed.
+sounddevice==0.5.5
+numpy==2.4.2
+scipy==1.17.1
+python-dotenv==1.2.1
+pystray==0.19.5
+Pillow==12.1.1
+# XDG desktop portals (Wayland typing + global shortcut) and the tray's AppIndicator backend
+PyGObject==3.54.5; sys_platform == "linux"

@@ -1,0 +1,2 @@
+# Push-to-talk on X11, Windows and macOS (typing on X11 uses the xdotool binary)
+pynput==1.8.1

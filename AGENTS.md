@@ -21,7 +21,7 @@ python -m unittest tests.test_main.TestDictate.test_record_audio_ppt_short -v  #
 
 # Setup
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt           # everything; requirements/*.txt split core and optional modules
 ```
 
 No linter or formatter is configured.

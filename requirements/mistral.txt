@@ -1,0 +1,2 @@
+# Transcription via the Mistral AI API (needs MISTRAL_API_KEY)
+mistralai==1.12.4

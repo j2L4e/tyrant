@@ -1,10 +1,7 @@
-sounddevice==0.5.5
-numpy==2.4.2
-scipy==1.17.1
-mistralai==1.12.4
-python-dotenv==1.2.1
-pynput==1.8.1
-pystray==0.19.5
-Pillow==12.1.1
-PyGObject==3.54.5
-faster-whisper==1.1.1
+# Everything. To install only what you need, pick from requirements/:
+#   core.txt (always), x11.txt, whisper.txt, mistral.txt
+# whisper.cpp with GPU support is built separately, see README.
+-r requirements/core.txt
+-r requirements/x11.txt
+-r requirements/whisper.txt
+-r requirements/mistral.txt

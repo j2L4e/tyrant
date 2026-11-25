@@ -1,0 +1,2 @@
+# Local transcription with faster-whisper (CPU, or NVIDIA GPU via CUDA)
+faster-whisper==1.1.1

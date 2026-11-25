@@ -37,10 +37,15 @@ You can force a specific implementation via environment variable (`TRANSCRIPTION
    python3 -m venv .venv
    source .venv/bin/activate
    ```
-3. Install the required Python packages:
+3. Install the required Python packages. Either everything:
    ```bash
    pip install -r requirements.txt
    ```
+   or only the parts you need: `requirements/core.txt` is always required; add `whisper.txt` (local faster-whisper), `mistral.txt` (Mistral API) and/or `x11.txt` (push-to-talk via pynput on X11, Windows, macOS):
+   ```bash
+   pip install -r requirements/core.txt -r requirements/whisper.txt
+   ```
+   For local transcription on a non-NVIDIA GPU, see [whisper.cpp](#whispercpp-local-gpu-configuration).
 
 ## Configuration
 
