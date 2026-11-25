@@ -4,15 +4,16 @@ A cross-platform speech-to-text dictation app. Tyrant records your microphone, t
 
 ### Modules
 
-Tyrant uses three module types, each with a base class and one or more implementations. The first available implementation is selected automatically at startup.
+Tyrant uses four module types, each with a base class and one or more implementations. The first available implementation is selected automatically at startup.
 
 | Module | What it does | Implementations (by priority) |
 |---|---|---|
 | **Transcription** | Converts recorded audio to text | `whisper` — local inference via [faster-whisper](https://github.com/SYSTRAN/faster-whisper) · `mistral` — Mistral AI API · `noop` — placeholder |
-| **Output** | Types the transcribed text into the active window | `xdotool` — Linux/X11 · `noop` — logs only |
+| **Output** | Types the transcribed text into the active window | `portal` — Wayland (XDG RemoteDesktop portal) · `xdotool` — Linux/X11 · `noop` — logs only |
+| **Hotkey** | Detects the push-to-talk key | `portal` — Wayland (XDG GlobalShortcuts portal) · `pynput` — X11, Windows, macOS |
 | **Notification** | Shows status notifications to the user | `notify-send` — Linux (libnotify) · `noop` — logs only |
 
-You can force a specific implementation via environment variable (`TRANSCRIPTION`, `OUTPUT`, `NOTIFICATION`). See [Forcing a Specific Module](#forcing-a-specific-module) below.
+You can force a specific implementation via environment variable (`TRANSCRIPTION`, `OUTPUT`, `NOTIFICATION`, `HOTKEY`). See [Forcing a Specific Module](#forcing-a-specific-module) below.
 
 ## Features
 
@@ -23,6 +24,7 @@ You can force a specific implementation via environment variable (`TRANSCRIPTION
 
 - Python 3.x
 - PortAudio (required for `sounddevice`, e.g., `sudo apt install libportaudio2`)
+- On Wayland: `xdg-desktop-portal` with a backend offering GlobalShortcuts and RemoteDesktop (e.g. `xdg-desktop-portal-kde`)
 - `xdotool` (optional, for automatic typing on Linux/X11)
 - `notify-send` (optional, for system notifications on Linux)
 - Mistral API Key (optional, if using Mistral transcription)
@@ -104,15 +106,23 @@ You can force a specific module via environment variables. If the forced module 
 
 ```env
 TRANSCRIPTION=whisper    # or: mistral, noop
-OUTPUT=xdotool           # or: noop
+OUTPUT=portal            # or: xdotool, noop
+HOTKEY=portal            # or: pynput
 NOTIFICATION=notify-send # or: noop
 ```
 
 When these variables are not set, the first available module is used automatically (see priority order below).
 
 ### Output Methods
-1.  **xdotool**: Uses `xdotool` to type text. (Requires `xdotool` installed).
-2.  **noop**: A fallback that only logs the transcription if no typing tool is found.
+1.  **portal**: Wayland. Types via the XDG RemoteDesktop portal using keysyms, so any keyboard layout works. The desktop asks for permission on first start; the grant is remembered (`~/.local/state/tyrant/remote_desktop_token`).
+2.  **xdotool**: Uses `xdotool` to type text. (Requires `xdotool` installed).
+3.  **noop**: A fallback that only logs the transcription if no typing tool is found.
+
+### Hotkey Methods (Push-To-Talk)
+1.  **portal**: Wayland. Registers a global shortcut via the XDG GlobalShortcuts portal. The `--ptt` key is only a suggestion; confirm it in the desktop's dialog on first start and change it later in the desktop's shortcut settings. Tyrant creates `~/.local/share/applications/tyrant.desktop`, which the portal needs to identify the app.
+2.  **pynput**: X11, Windows, macOS. Listens for the `--ptt` key directly.
+
+If a portal module fails to start (e.g. the permission dialog is cancelled), the next method is used.
 
 ### Transcription Methods
 1.  **whisper**: Local transcription using [faster-whisper](https://github.com/SYSTRAN/faster-whisper). (Requires `faster-whisper` installed, no API key needed).
@@ -125,11 +135,11 @@ When these variables are not set, the first available module is used automatical
 
 ### Implementing Custom Methods
 
-You can easily add new methods by inheriting from the `Output`, `Transcription`, or `Notification` base classes and implementing the required interface (`is_available()` and `type(text)`, `transcribe(file_path)`, or `notify(title, message)`). Register the new class in the corresponding `*_MODULES` dict to make it available via the env var.
+You can easily add new methods by inheriting from the `Output`, `Transcription`, `Notification`, or `Hotkey` base classes and implementing the required interface (`is_available()` and `type(text)`, `transcribe(file_path)`, or `notify(title, message)`). Register the new class in the corresponding `*_MODULES` dict to make it available via the env var.
 
 ## Notes
 
-- Ensure you have a window focused where you want the text to appear before the transcription finishes (if using `xdotool`).
+- Ensure you have a window focused where you want the text to appear before the transcription finishes (when using `xdotool` or `portal` output).
 
 ## License
 

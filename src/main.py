@@ -8,13 +8,16 @@ import time
 import logging
 import argparse
 import threading
-from pynput import keyboard
 import pystray
 from pystray import MenuItem as item
 from tray import create_idle_icon, create_muted_icon, create_recording_icon, create_transcribing_icon
 from output import use_output
 from transcription import use_transcription
 from notification import use_notification
+from hotkey import use_hotkey, PRESS, RELEASE
+
+MIN_PTT_DURATION = 2.0
+MAX_ERROR_DELAY = 30
 
 def setup_logging(verbose):
     level = logging.DEBUG if verbose else logging.INFO
@@ -22,71 +25,41 @@ def setup_logging(verbose):
 
 load_dotenv()
 
-def record_audio(fs=16000, ptt_key=None, tray_icon=None, icons=None, muted=None):
+def record_audio(fs=16000, hotkey=None, tray_icon=None, icons=None, muted=None, stop_event=None):
     """
     Records audio from the microphone.
-    If ptt_key is provided, it uses push-to-talk.
+    If hotkey is provided, it uses push-to-talk.
     Otherwise, it records until Ctrl+C.
     """
     recording = []
-    
+
     def callback(indata, frames, time, status):
         if status:
             logging.warning(f"Audio status: {status}")
-        if not ptt_key or is_recording.is_set():
-            recording.append(indata.copy())
+        recording.append(indata.copy())
 
-    if ptt_key:
-        logging.info(f"Hold '{ptt_key}' to record.")
-        is_recording = threading.Event()
-        stop_event = threading.Event()
-        start_time = [0]
-        duration = [0]
+    if hotkey:
+        logging.info("Hold the push-to-talk key to record.")
+        start_time = hotkey.wait(PRESS, stop_event)
+        if start_time is None:
+            return None, fs  # stopped while waiting
+        if muted and muted.is_set():
+            hotkey.wait(RELEASE, stop_event)
+            return None, fs  # Don't record when muted
 
-        def on_press(key):
-            try:
-                k = key.char  # single-char keys
-            except AttributeError:
-                k = key.name  # special keys
-            
-            if k == ptt_key and not is_recording.is_set():
-                if muted and muted.is_set():
-                    return  # Don't record when muted
-                logging.info("Recording started...")
-                if tray_icon and icons:
-                    tray_icon.icon = icons['recording']
-                start_time[0] = time.time()
-                is_recording.set()
-
-        def on_release(key):
-            try:
-                k = key.char
-            except AttributeError:
-                k = key.name
-            
-            if k == ptt_key:
-                duration[0] = time.time() - start_time[0]
-                logging.info(f"Recording stopped. Duration: {duration[0]:.2f}s")
-                if tray_icon and icons:
-                    tray_icon.icon = icons['idle']
-                is_recording.clear()
-                stop_event.set()
-                return False  # Stop listener
-
-        with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
+        logging.info("Recording started...")
+        if tray_icon and icons:
+            tray_icon.icon = icons['recording']
+        try:
             with sd.InputStream(samplerate=fs, channels=1, callback=callback):
-                while not is_recording.is_set():
-                    if not listener.running: # Handle case where key was released before we started waiting
-                         break
-                    time.sleep(0.01)
-                
-                # While we are recording, keep the stream open
-                while is_recording.is_set():
-                    time.sleep(0.01)
-            
-            listener.join()
-        
-        if duration[0] <= 2.0:
+                end_time = hotkey.wait(RELEASE, stop_event)
+        finally:
+            if tray_icon and icons:
+                tray_icon.icon = icons['idle']
+
+        duration = (end_time or time.monotonic()) - start_time
+        logging.info(f"Recording stopped. Duration: {duration:.2f}s")
+        if duration <= MIN_PTT_DURATION:
             logging.info("Recording too short, discarding.")
             return None, fs
     else:
@@ -114,16 +87,16 @@ def save_temp_wav(data, fs):
     logging.debug(f"Saved temporary audio to {temp_file.name}")
     return temp_file.name
 
-def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output, transcription, notification):
+def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output, transcription, notification, hotkey=None):
+    error_delay = 0
     while not stop_event.is_set():
         try:
-            if muted.is_set():
+            if muted.is_set() and not hotkey:
                 time.sleep(0.1)
                 continue
-            audio_data, fs = record_audio(ptt_key=args.ptt, tray_icon=tray_icon, icons=icons, muted=muted)
+            audio_data, fs = record_audio(hotkey=hotkey, tray_icon=tray_icon, icons=icons, muted=muted, stop_event=stop_event)
             if audio_data is None:
-                if args.ptt:
-                    time.sleep(0.1)
+                if hotkey:
                     continue # Wait for next press if PTT
                 else:
                     logging.info("No audio recorded.")
@@ -140,17 +113,25 @@ def run_transcription_loop(args, tray_icon, icons, stop_event, muted, output, tr
             output.type(text)
             os.unlink(temp_wav)
             logging.debug(f"Deleted temporary file {temp_wav}")
-            
-            if not args.ptt:
+            error_delay = 0
+
+            if not hotkey:
                 break # In manual mode, we finish after one recording
         except KeyboardInterrupt:
             logging.info("Exiting transcription loop...")
             break
         except Exception as e:
             logging.error(f"{e}")
-            notification.notify("Error", f"{e}")
-            if not args.ptt:
+            if not hotkey:
+                notification.notify("Error", f"{e}")
                 break
+            # Back off on repeated errors (e.g. audio not ready yet after login)
+            # and only notify about the first one.
+            if error_delay == 0:
+                notification.notify("Error", f"{e}")
+            error_delay = min(max(error_delay * 2, 1), MAX_ERROR_DELAY)
+            logging.info(f"Retrying in {error_delay}s.")
+            stop_event.wait(error_delay)
     
     if tray_icon:
         tray_icon.stop()
@@ -202,8 +183,14 @@ def main():
     transcription = use_transcription(os.getenv("TRANSCRIPTION"))
     notification = use_notification(os.getenv("NOTIFICATION"))
 
+    hotkey = None
+    if args.ptt:
+        hotkey = use_hotkey(args.ptt, os.getenv("HOTKEY"))
+        if hotkey is None:
+            raise RuntimeError("No push-to-talk method available on this system.")
+
     # Start transcription in a separate thread
-    transcription_thread = threading.Thread(target=run_transcription_loop, args=(args, icon, icons, stop_event, muted, output, transcription, notification))
+    transcription_thread = threading.Thread(target=run_transcription_loop, args=(args, icon, icons, stop_event, muted, output, transcription, notification, hotkey))
     transcription_thread.daemon = True
     transcription_thread.start()
 
@@ -214,6 +201,9 @@ def main():
         logging.info("Keyboard interrupt, exiting...")
         stop_event.set()
         icon.stop()
+    finally:
+        if hotkey:
+            hotkey.close()
 
 if __name__ == "__main__":
     main()

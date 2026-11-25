@@ -15,74 +15,85 @@ from transcription import Transcription, TranscriptionMistral, TranscriptionWhis
 
 class TestDictate(unittest.TestCase):
 
+    def _fake_hotkey(self, hold_seconds, on_recording=None):
+        """A hotkey that is pressed once and released after hold_seconds."""
+        from hotkey import Hotkey, PRESS, RELEASE
+
+        hotkey = Hotkey()
+        now = time.monotonic()
+        hotkey._events.put((PRESS, now))
+        original_wait = hotkey.wait
+
+        def wait(kind, stop_event=None, poll=0.01):
+            if kind == RELEASE:
+                if on_recording:
+                    on_recording()
+                hotkey._events.put((RELEASE, now + hold_seconds))
+            return original_wait(kind, stop_event, poll)
+
+        hotkey.wait = wait
+        return hotkey
+
     @patch('main.sd.InputStream')
-    @patch('main.keyboard.Listener')
-    def test_record_audio_ptt_short(self, mock_listener, mock_input_stream):
-        # Simulate a short press (1 second)
-        mock_listener_instance = MagicMock()
-        mock_listener.return_value.__enter__.return_value = mock_listener_instance
-        
-        def mock_listener_side_effect(on_press, on_release):
-            class FakeKey:
-                name = 'ctrl'
-            
-            # Start a thread to simulate the key press after some time
-            def simulate_key():
-                time.sleep(0.1)
-                on_press(FakeKey())
-                time.sleep(1) # Short duration
-                on_release(FakeKey())
-                mock_listener_instance.running = False
-
-            threading.Thread(target=simulate_key).start()
-            return mock_listener_instance
-
-        mock_listener.side_effect = mock_listener_side_effect
-
-        audio_data, fs = main.record_audio(ptt_key='ctrl')
-        
+    def test_record_audio_ptt_short(self, mock_input_stream):
+        audio_data, fs = main.record_audio(hotkey=self._fake_hotkey(1.0))
         self.assertIsNone(audio_data)
 
     @patch('main.sd.InputStream')
-    @patch('main.keyboard.Listener')
-    def test_record_audio_ptt_long(self, mock_listener, mock_input_stream):
-        # Simulate a long press (2.5 seconds)
-        mock_listener_instance = MagicMock()
-        mock_listener.return_value.__enter__.return_value = mock_listener_instance
-        
-        # We need to capture the callback passed to InputStream
+    def test_record_audio_ptt_long(self, mock_input_stream):
         callback_container = [None]
+
         def mock_input_stream_side_effect(**kwargs):
             callback_container[0] = kwargs.get('callback')
             return MagicMock()
         mock_input_stream.side_effect = mock_input_stream_side_effect
 
-        def mock_listener_side_effect(on_press, on_release):
-            class FakeKey:
-                name = 'ctrl'
-            
-            def simulate_key():
-                time.sleep(0.1)
-                on_press(FakeKey())
-                # While recording is active, simulate some audio callbacks
-                for _ in range(5):
-                    if callback_container[0]:
-                        callback_container[0](np.zeros((100, 1)), 100, None, None)
-                    time.sleep(0.1)
-                
-                time.sleep(2.0) # Total > 2 seconds
-                on_release(FakeKey())
-                mock_listener_instance.running = False
+        def feed_audio():
+            for _ in range(5):
+                callback_container[0](np.zeros((100, 1)), 100, None, None)
 
-            threading.Thread(target=simulate_key).start()
-            return mock_listener_instance
-
-        mock_listener.side_effect = mock_listener_side_effect
-
-        audio_data, fs = main.record_audio(ptt_key='ctrl')
-        
+        audio_data, fs = main.record_audio(hotkey=self._fake_hotkey(2.5, feed_audio))
         self.assertIsNotNone(audio_data)
-        self.assertTrue(len(audio_data) > 0)
+        self.assertEqual(len(audio_data), 500)
+        mock_input_stream.assert_called_once()
+
+    @patch('main.sd.InputStream')
+    def test_record_audio_ptt_muted(self, mock_input_stream):
+        muted = threading.Event()
+        muted.set()
+        audio_data, fs = main.record_audio(hotkey=self._fake_hotkey(3.0), muted=muted)
+        self.assertIsNone(audio_data)
+        mock_input_stream.assert_not_called()
+
+    @patch('main.sd.InputStream')
+    def test_record_audio_ptt_stopped(self, mock_input_stream):
+        from hotkey import Hotkey
+        stop_event = threading.Event()
+        stop_event.set()
+        audio_data, fs = main.record_audio(hotkey=Hotkey(), stop_event=stop_event)
+        self.assertIsNone(audio_data)
+        mock_input_stream.assert_not_called()
+
+    @patch('main.record_audio')
+    def test_loop_backs_off_and_notifies_once(self, mock_record):
+        stop_event = threading.Event()
+        calls = []
+
+        def failing_record(**kwargs):
+            calls.append(1)
+            if len(calls) >= 3:
+                stop_event.set()
+            raise RuntimeError("Invalid sample rate")
+        mock_record.side_effect = failing_record
+
+        notification = MagicMock()
+        args = MagicMock(ptt='scroll_lock')
+        with patch.object(stop_event, 'wait') as mock_wait:
+            main.run_transcription_loop(args, None, None, stop_event, threading.Event(),
+                                        MagicMock(), MagicMock(), notification, hotkey=MagicMock())
+
+        self.assertEqual(notification.notify.call_count, 1)
+        self.assertEqual([c.args[0] for c in mock_wait.call_args_list], [1, 2, 4])
 
     @patch('transcription.Mistral')
     def test_transcribe_audio(self, mock_mistral):
@@ -130,7 +141,8 @@ class TestDictate(unittest.TestCase):
         out = OutputXdotool()
         self.assertFalse(out.is_available())
 
-    def test_use_output(self):
+    @patch('output.OutputPortal.is_available', return_value=False)
+    def test_use_output(self, _mock_portal):
         from output import OutputNoop
         with patch('output.OutputXdotool.is_available') as mock_available:
             # Test when OutputXdotool is available
