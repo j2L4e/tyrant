@@ -11,7 +11,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src'
 
 import main
 from output import Output, OutputXdotool, use_output
-from transcription import Transcription, TranscriptionMistral, TranscriptionWhisper, use_transcription
+from transcription import (Transcription, TranscriptionMistral, TranscriptionWhisper,
+                           TranscriptionWhisperCpp, use_transcription)
 
 class TestDictate(unittest.TestCase):
 
@@ -221,12 +222,14 @@ class TestDictate(unittest.TestCase):
             self.assertEqual(whisper.device, "cuda")
             self.assertEqual(whisper.compute_type, "float16")
 
-    def test_whisper_priority_over_mistral(self):
+    @patch.object(TranscriptionWhisperCpp, 'is_available', return_value=False)
+    def test_whisper_priority_over_mistral(self, _):
         with patch.object(TranscriptionWhisper, 'is_available', return_value=True):
             trans = use_transcription()
             self.assertIsInstance(trans, TranscriptionWhisper)
 
-    def test_use_transcription(self):
+    @patch.object(TranscriptionWhisperCpp, 'is_available', return_value=False)
+    def test_use_transcription(self, _):
         from transcription import TranscriptionNoop
         with patch.object(TranscriptionWhisper, 'is_available', return_value=False):
             with patch('transcription.TranscriptionMistral.is_available') as mock_available:
@@ -239,6 +242,53 @@ class TestDictate(unittest.TestCase):
                 mock_available.return_value = False
                 trans = use_transcription()
                 self.assertIsInstance(trans, TranscriptionNoop)
+
+    @patch('scipy.io.wavfile.read')
+    def test_whispercpp_transcribe(self, mock_wavfile_read):
+        mock_wavfile_read.return_value = (16000, np.zeros((16000,), dtype=np.int16))
+        mock_segment_1 = MagicMock()
+        mock_segment_1.text = " Hello"
+        mock_segment_2 = MagicMock()
+        mock_segment_2.text = " world."
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = [mock_segment_1, mock_segment_2]
+
+        whispercpp = TranscriptionWhisperCpp()
+        whispercpp._model = mock_model
+
+        self.assertEqual(whispercpp.transcribe("test.wav"), "Hello world.")
+        audio = mock_model.transcribe.call_args[0][0]
+        self.assertEqual(audio.dtype, np.float32)
+
+    def test_whispercpp_model_env(self):
+        with patch.dict(os.environ, {"WHISPER_MODEL": "medium"}):
+            os.environ.pop("WHISPERCPP_MODEL", None)
+            self.assertEqual(TranscriptionWhisperCpp().model_name, "medium")
+        with patch.dict(os.environ, {"WHISPER_MODEL": "medium", "WHISPERCPP_MODEL": "large-v3-turbo"}):
+            self.assertEqual(TranscriptionWhisperCpp().model_name, "large-v3-turbo")
+
+    @patch('transcription.os.listdir')
+    @patch('transcription.importlib.util.find_spec')
+    def test_whispercpp_requires_gpu_backend(self, mock_find_spec, mock_listdir):
+        mock_find_spec.return_value = MagicMock(origin="/site-packages/_pywhispercpp.so")
+
+        mock_listdir.return_value = ["libggml-base.so.0", "libggml-cpu.so.0", "libwhisper.so.1"]
+        self.assertFalse(TranscriptionWhisperCpp().is_available())
+
+        mock_listdir.return_value = ["libggml-cpu.so.0", "libggml-vulkan.so.0"]
+        whispercpp = TranscriptionWhisperCpp()
+        self.assertTrue(whispercpp.is_available())
+        self.assertEqual(whispercpp.gpu_backends(), ["vulkan"])
+
+    @patch('transcription.importlib.util.find_spec', return_value=None)
+    def test_whispercpp_not_installed(self, _):
+        self.assertFalse(TranscriptionWhisperCpp().is_available())
+
+    @patch.object(TranscriptionWhisperCpp, 'init')
+    @patch.object(TranscriptionWhisperCpp, 'is_available', return_value=True)
+    def test_whispercpp_priority_over_whisper(self, _available, _init):
+        with patch.object(TranscriptionWhisper, 'is_available', return_value=True):
+            self.assertIsInstance(use_transcription(), TranscriptionWhisperCpp)
 
     def test_transcription_selection_logic(self):
         class MockTransAvailable(Transcription):

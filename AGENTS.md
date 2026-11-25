@@ -38,7 +38,7 @@ All source lives in `src/`. There is no package structure — modules import eac
 
 | Module | Implementations (by priority) |
 |---|---|
-| `transcription.py` | `whisper` (local faster-whisper) → `mistral` (API) → `noop` |
+| `transcription.py` | `whispercpp` (local whisper.cpp, only with a GPU backend) → `whisper` (local faster-whisper) → `mistral` (API) → `noop` |
 | `output.py` | `portal` (RemoteDesktop, Wayland) → `xdotool` → `noop` |
 | `hotkey.py` | `portal` (GlobalShortcuts, Wayland) → `pynput` |
 | `notification.py` | `notify-send` → `noop` |

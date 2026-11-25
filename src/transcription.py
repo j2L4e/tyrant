@@ -1,7 +1,18 @@
 import os
 import logging
+import importlib.util
 from mistralai import Mistral
 from mistralai.models import File
+
+
+def load_wav_float32(file_path: str):
+    """Read a WAV file as float32 samples in [-1, 1], as Whisper models expect."""
+    import numpy as np
+    import scipy.io.wavfile as wavfile
+    _, audio_data = wavfile.read(file_path)
+    if not np.issubdtype(audio_data.dtype, np.floating):
+        audio_data = audio_data.astype(np.float32) / np.iinfo(audio_data.dtype).max
+    return audio_data.astype(np.float32, copy=False)
 
 
 class Transcription:
@@ -64,17 +75,72 @@ class TranscriptionWhisper(Transcription):
         self._load_model()
 
     def transcribe(self, file_path: str) -> str:
-        import numpy as np
-        import scipy.io.wavfile as wavfile
-        sample_rate, audio_data = wavfile.read(file_path)
-        if not np.issubdtype(audio_data.dtype, np.floating):
-            audio_data = audio_data.astype(np.float32) / np.iinfo(audio_data.dtype).max
+        audio_data = load_wav_float32(file_path)
         segments, info = self._model.transcribe(audio_data, beam_size=5)
         text = "".join(segment.text for segment in segments).strip()
         logging.debug(
             f"Whisper transcription (lang={info.language}, "
             f"prob={info.language_probability:.2f}): {text}"
         )
+        return text
+
+
+class TranscriptionWhisperCpp(Transcription):
+    """
+    Transcription implementation using whisper.cpp (via pywhispercpp) for local
+    GPU inference. Only available when pywhispercpp is built with a GPU backend
+    (e.g. Vulkan), since faster-whisper is the better choice on CPU.
+    """
+
+    GPU_BACKENDS = ("vulkan", "cuda", "hip", "metal", "sycl", "musa", "opencl")
+
+    def __init__(self):
+        self.model_name = os.getenv("WHISPERCPP_MODEL") or os.getenv("WHISPER_MODEL", "base")
+        self._model = None
+
+    def gpu_backends(self) -> list:
+        """GPU backends pywhispercpp was built with, found without importing it."""
+        spec = importlib.util.find_spec("_pywhispercpp")
+        if spec is None or not spec.origin:
+            return []
+        files = os.listdir(os.path.dirname(spec.origin))
+        return [b for b in self.GPU_BACKENDS
+                if any(f.startswith(f"libggml-{b}.") for f in files)]
+
+    def is_available(self) -> bool:
+        if importlib.util.find_spec("pywhispercpp") is None:
+            return False
+        if not self.gpu_backends():
+            logging.debug("pywhispercpp is installed without a GPU backend; skipping whisper.cpp.")
+            return False
+        return True
+
+    def _load_model(self):
+        if self._model is None:
+            from pywhispercpp.model import Model
+            debug = logging.getLogger().isEnabledFor(logging.DEBUG)
+            logging.info(
+                f"Loading whisper.cpp model '{self.model_name}' "
+                f"(backends: {', '.join(self.gpu_backends())})"
+            )
+            self._model = Model(
+                self.model_name,
+                # whisper.cpp logs to stderr; only show it in verbose mode
+                redirect_whispercpp_logs_to=False if debug else None,
+                language="auto",
+                print_progress=False,
+                print_realtime=False,
+            )
+            logging.info(f"whisper.cpp model '{self.model_name}' ready.")
+
+    def init(self):
+        self._load_model()
+
+    def transcribe(self, file_path: str) -> str:
+        audio_data = load_wav_float32(file_path)
+        segments = self._model.transcribe(audio_data)
+        text = "".join(segment.text for segment in segments).strip()
+        logging.debug(f"whisper.cpp transcription: {text}")
         return text
 
 
@@ -138,6 +204,7 @@ class TranscriptionNoop(Transcription):
 
 
 TRANSCRIPTION_MODULES = {
+    "whispercpp": TranscriptionWhisperCpp,
     "whisper": TranscriptionWhisper,
     "mistral": TranscriptionMistral,
     "noop": TranscriptionNoop,
@@ -167,6 +234,7 @@ def use_transcription(forced=None):
         return instance
 
     transcription_classes = [
+        TranscriptionWhisperCpp,
         TranscriptionWhisper,
         TranscriptionMistral,
         TranscriptionNoop

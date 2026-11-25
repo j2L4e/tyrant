@@ -68,6 +68,26 @@ WHISPER_COMPUTE_TYPE=auto
 
 The model is downloaded automatically on first use.
 
+### whisper.cpp (Local, GPU) Configuration
+
+faster-whisper only uses NVIDIA GPUs (CUDA). For other GPUs (e.g. AMD) Tyrant can run Whisper through [whisper.cpp](https://github.com/ggml-org/whisper.cpp) with its Vulkan backend. The prebuilt `pywhispercpp` wheel is CPU-only, so build it with Vulkan into the venv (needs the Vulkan headers, SPIR-V headers and `glslc`; on Arch: `vulkan-headers spirv-headers shaderc`):
+
+```bash
+env -i HOME="$HOME" PATH="$PATH" GGML_VULKAN=1 \
+    CMAKE_BUILD_WITH_INSTALL_RPATH=ON 'CMAKE_INSTALL_RPATH=$ORIGIN' \
+    .venv/bin/pip install --no-binary pywhispercpp pywhispercpp==1.5.1
+```
+
+(`env -i` is needed because pywhispercpp's build passes every environment variable to CMake.)
+
+When pywhispercpp is built with a GPU backend, it is preferred over faster-whisper. A CPU-only build is ignored, since faster-whisper is faster on CPU.
+
+```env
+WHISPERCPP_MODEL=large-v3-turbo
+```
+
+- `WHISPERCPP_MODEL`: A [whisper.cpp model name](https://huggingface.co/ggerganov/whisper.cpp) such as `base`, `small`, `medium`, `large-v3-turbo`, or a quantized variant like `large-v3-turbo-q5_0` (default: `WHISPER_MODEL`, else `base`). Models are downloaded to `~/.local/share/pywhispercpp/models` on first use.
+
 ## Usage
 
 Run the application:
@@ -105,7 +125,7 @@ The application uses a flexible system for output, transcription, and notificati
 You can force a specific module via environment variables. If the forced module is not available (missing dependencies, missing API key, etc.), Tyrant will exit with an error on startup.
 
 ```env
-TRANSCRIPTION=whisper    # or: mistral, noop
+TRANSCRIPTION=whisper    # or: whispercpp, mistral, noop
 OUTPUT=portal            # or: xdotool, noop
 HOTKEY=portal            # or: pynput
 NOTIFICATION=notify-send # or: noop
@@ -125,9 +145,10 @@ When these variables are not set, the first available module is used automatical
 If a portal module fails to start (e.g. the permission dialog is cancelled), the next method is used.
 
 ### Transcription Methods
-1.  **whisper**: Local transcription using [faster-whisper](https://github.com/SYSTRAN/faster-whisper). (Requires `faster-whisper` installed, no API key needed).
-2.  **mistral**: Uses Mistral AI's API. (Requires `MISTRAL_API_KEY` in `.env`).
-3.  **noop**: A fallback that returns a placeholder string if no transcription service is configured.
+1.  **whispercpp**: Local GPU transcription using [whisper.cpp](https://github.com/ggml-org/whisper.cpp). (Requires `pywhispercpp` built with a GPU backend such as Vulkan, see above).
+2.  **whisper**: Local transcription using [faster-whisper](https://github.com/SYSTRAN/faster-whisper). (Requires `faster-whisper` installed, no API key needed).
+3.  **mistral**: Uses Mistral AI's API. (Requires `MISTRAL_API_KEY` in `.env`).
+4.  **noop**: A fallback that returns a placeholder string if no transcription service is configured.
 
 ### Notification Methods
 1.  **notify-send**: Uses `notify-send` to show system notifications. (Requires `libnotify-bin` or equivalent).
