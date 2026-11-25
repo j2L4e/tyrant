@@ -77,6 +77,10 @@ class TestOutputPortal(unittest.TestCase):
             ("/session/rd", {}, 0xFF0D, 1), ("/session/rd", {}, 0xFF0D, 0),
         ])
 
+    def _sent_keys(self):
+        return [c.args[2].unpack()[2:] for c in self.portal.call.call_args_list
+                if c.args[1] == "NotifyKeyboardKeysym"]
+
     def test_type_reconnects_once_on_failure(self):
         out = OutputPortal()
         out.init()
@@ -84,9 +88,52 @@ class TestOutputPortal(unittest.TestCase):
         out.type("a")
         self.assertEqual(self.portal.create_session.call_count, 2)
 
+    def test_reconnect_resumes_without_retyping(self):
+        with patch.dict(os.environ, {"TYPING_DELAY_MS": "0"}):
+            out = OutputPortal()
+        out.init()
+        # "ab": press a, release a, then pressing b fails
+        self.portal.call.side_effect = [None, None, RuntimeError("session closed"), None, None]
+        out.type("ab")
+        self.assertEqual(self._sent_keys(), [
+            (ord("a"), 1), (ord("a"), 0),
+            (ord("b"), 1),            # failed
+            (ord("b"), 1), (ord("b"), 0),
+        ])
+
+    @patch('output.time.sleep')
+    def test_typing_delay_between_characters(self, mock_sleep):
+        with patch.dict(os.environ, {"TYPING_DELAY_MS": "20"}):
+            out = OutputPortal()
+        out.init()
+        out.type("abc")
+        self.assertEqual(mock_sleep.call_count, 2)  # not before the first char
+        for call in mock_sleep.call_args_list:
+            self.assertTrue(0.01 <= call.args[0] <= 0.03)
+
+    @patch('output.time.sleep')
+    def test_default_delay(self, mock_sleep):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("TYPING_DELAY_MS", None)
+            out = OutputPortal()
+        self.assertEqual(out.delay, 0.012)
+        with patch.dict(os.environ, {"TYPING_DELAY_MS": "0"}):
+            self.assertEqual(OutputPortal().delay, 0)
+        with patch.dict(os.environ, {"TYPING_DELAY_MS": "fast"}):
+            self.assertEqual(OutputPortal().delay, 0.012)
+
     def test_not_available_without_wayland(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(OutputPortal().is_available())
+
+
+class TestXdotoolDelay(unittest.TestCase):
+
+    @patch('output.subprocess.run')
+    def test_delay_passed_when_set(self, mock_run):
+        with patch.dict(os.environ, {"TYPING_DELAY_MS": "30"}):
+            OutputXdotool().type("hi")
+        mock_run.assert_called_with(['xdotool', 'type', '--clearmodifiers', '--delay', '30', 'hi'])
 
 
 class TestUseOutputPortal(unittest.TestCase):

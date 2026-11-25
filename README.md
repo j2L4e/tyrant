@@ -114,7 +114,7 @@ NOTIFICATION=notify-send # or: noop
 When these variables are not set, the first available module is used automatically (see priority order below).
 
 ### Output Methods
-1.  **portal**: Wayland. Types via the XDG RemoteDesktop portal using keysyms, so any keyboard layout works. The desktop asks for permission on first start; the grant is remembered (`~/.local/state/tyrant/remote_desktop_token`).
+1.  **portal**: Wayland. Types via the XDG RemoteDesktop portal using keysyms, so any keyboard layout works. The desktop asks for permission on first start; the grant is remembered (`~/.local/state/tyrant/remote_desktop_token`). Characters are typed with a short, slightly varied delay (`TYPING_DELAY_MS`, default 12 ms) so the text appears naturally.
 2.  **xdotool**: Uses `xdotool` to type text. (Requires `xdotool` installed).
 3.  **noop**: A fallback that only logs the transcription if no typing tool is found.
 

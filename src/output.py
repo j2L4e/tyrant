@@ -1,4 +1,6 @@
 import os
+import time
+import random
 import subprocess
 import shutil
 import logging
@@ -37,6 +39,21 @@ def keysym_for(ch: str) -> int:
     return 0x01000000 + cp  # Unicode keysym
 
 
+DEFAULT_TYPING_DELAY_MS = 12  # same as xdotool's default
+
+
+def typing_delay_ms(default=None):
+    """Delay between typed characters from TYPING_DELAY_MS, or default if unset/invalid."""
+    value = os.getenv("TYPING_DELAY_MS")
+    if value is None or value.strip() == "":
+        return default
+    try:
+        return max(0, int(value))
+    except ValueError:
+        logging.warning(f"Invalid TYPING_DELAY_MS '{value}', using default.")
+        return default
+
+
 def token_path():
     state_home = os.getenv("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
     return os.path.join(state_home, "tyrant", "remote_desktop_token")
@@ -57,6 +74,7 @@ class OutputPortal(Output):
     def __init__(self):
         self._portal = None
         self._session = None
+        self.delay = typing_delay_ms(DEFAULT_TYPING_DELAY_MS) / 1000
 
     def is_available(self) -> bool:
         return bool(os.getenv("WAYLAND_DISPLAY")) and portal_supports(self.IFACE)
@@ -108,14 +126,26 @@ class OutputPortal(Output):
         except OSError as e:
             logging.warning(f"Could not save remote desktop restore token: {e}")
 
-    def _send(self, text):
+    def _key(self, keysym, state):
         from gi.repository import GLib
 
-        for ch in text:
-            keysym = keysym_for(ch)
-            for state in (1, 0):  # press, release
-                self._portal.call(self.IFACE, "NotifyKeyboardKeysym", GLib.Variant(
-                    "(oa{sv}iu)", (self._session, {}, keysym, state)))
+        self._portal.call(self.IFACE, "NotifyKeyboardKeysym", GLib.Variant(
+            "(oa{sv}iu)", (self._session, {}, keysym, state)))
+
+    def _send(self, text, start=0):
+        """
+        Type text from index start. Progress is tracked in self._typed, so a
+        failed send can be resumed without retyping characters.
+        """
+        self._typed = start
+        for i in range(start, len(text)):
+            if i > start and self.delay:
+                # Slight jitter so typing looks less mechanical
+                time.sleep(self.delay * random.uniform(0.5, 1.5))
+            keysym = keysym_for(text[i])
+            self._key(keysym, 1)  # press
+            self._typed = i + 1   # counts as typed once pressed
+            self._key(keysym, 0)  # release
 
     def type(self, text: str):
         logging.info(f"Typing with portal: {text}")
@@ -124,11 +154,12 @@ class OutputPortal(Output):
         try:
             self._send(text)
         except Exception as e:
-            # Session may have been closed (e.g. permission revoked); retry once
+            # Session may have been closed (e.g. permission revoked); reconnect
+            # once and continue where typing stopped
             logging.warning(f"Remote desktop session failed ({e}), reconnecting.")
             self._session = None
             self.init()
-            self._send(text)
+            self._send(text, self._typed)
 
 
 class OutputXdotool(Output):
@@ -141,7 +172,11 @@ class OutputXdotool(Output):
 
     def type(self, text: str):
         logging.info(f"Typing with xdotool: {text}")
-        subprocess.run(['xdotool', 'type', '--clearmodifiers', text])
+        command = ['xdotool', 'type', '--clearmodifiers']
+        delay = typing_delay_ms()
+        if delay is not None:
+            command += ['--delay', str(delay)]
+        subprocess.run(command + [text])
 
 
 class OutputNoop(Output):
